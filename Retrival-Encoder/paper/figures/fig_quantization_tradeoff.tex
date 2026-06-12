@@ -1,0 +1,63 @@
+% RAM vs. R@5 tradeoff scatter — pgfplots
+\begin{tikzpicture}
+\begin{axis}[
+    width=8cm, height=5cm,
+    xlabel={RAM (MB)},
+    ylabel={R@5},
+    xmin=60, xmax=440,
+    ymin=0.992, ymax=1.001,
+    xtick={91,147,209,255,364,418},
+    xticklabels={91,147,209,255,364,418},
+    xticklabel style={font=\small, rotate=30, anchor=east},
+    ytick={0.993,0.995,0.997,0.999,1.001},
+    yticklabels={0.993,0.995,0.997,0.999,1.001},
+    yticklabel style={font=\small},
+    grid=major, grid style={dashed, gray!25},
+    axis x line=bottom, axis y line=left,
+    clip=false,
+]
+\addplot[
+    only marks,
+    mark=*, mark size=4pt,
+    fill=fp32col, draw=fp32col!70!black
+] coordinates { (418, 0.9952) };
+\addplot[
+    only marks,
+    mark=square*, mark size=4pt,
+    fill=gray!60, draw=gray!80
+] coordinates { (209, 0.9932) };
+\addplot[
+    only marks,
+    mark=triangle*, mark size=4pt,
+    fill=blue!40, draw=blue!60
+] coordinates { (364, 0.9952) };
+\addplot[
+    only marks,
+    mark=triangle*, mark size=4pt,
+    fill=blue!55, draw=blue!70
+] coordinates { (255, 0.9990) };
+\addplot[
+    only marks,
+    mark=triangle*, mark size=4pt,
+    fill=blue!70, draw=blue!85
+] coordinates { (147, 0.9952) };
+\addplot[
+    only marks,
+    mark=*, mark size=5pt,
+    fill=int8col, draw=int8col!80!black
+] coordinates { (91, 0.9952) };
+
+\node[font=\tiny, anchor=west]  at (axis cs:424,0.9952) {FP32};
+\node[font=\tiny, anchor=west]  at (axis cs:215,0.9932) {FP16};
+\node[font=\tiny, anchor=west]  at (axis cs:370,0.9952) {MP-Con.};
+\node[font=\tiny, anchor=west]  at (axis cs:261,0.9990) {MP-Bal.};
+\node[font=\tiny, anchor=west]  at (axis cs:153,0.9952) {MP-Agg.};
+\node[font=\tiny, anchor=west, text=int8col!80!black, font=\tiny\bfseries]
+    at (axis cs:97,0.9952) {\textbf{INT8}};
+
+\draw[-Stealth, thick, int8col!70!black]
+    (axis cs:300,0.9945) -- (axis cs:100,0.9950)
+    node[midway, above, sloped, font=\tiny\itshape, text=int8col!60!black]
+    {Pareto-optimal};
+\end{axis}
+\end{tikzpicture}

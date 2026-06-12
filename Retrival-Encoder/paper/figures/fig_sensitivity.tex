@@ -1,0 +1,40 @@
+% Per-block INT8 sensitivity — pgfplots bar chart (all delta = 0)
+\begin{tikzpicture}
+\begin{axis}[
+    ybar,
+    width=8cm, height=4.5cm,
+    bar width=10pt,
+    ymin=-0.003, ymax=0.003,
+    ytick={-0.002,-0.001,0,0.001,0.002},
+    yticklabel style={font=\small},
+    ylabel={$\Delta$R@5 vs.\ FP32},
+    xlabel={Transformer Block Index},
+    xtick={0,1,...,11},
+    xticklabels={0,1,2,3,4,5,6,7,8,9,10,11},
+    xticklabel style={font=\small},
+    axis x line=bottom,
+    axis y line=left,
+    grid=major, grid style={dashed, gray!30},
+    enlarge x limits=0.05,
+    extra y ticks={0},
+    extra y tick style={grid=major, grid style={solid,black!50, thick}},
+]
+\addplot[fill=int8col!60, draw=int8col!80!black] coordinates {
+    (0,  0.0000)
+    (1,  0.0000)
+    (2,  0.0000)
+    (3,  0.0000)
+    (4,  0.0000)
+    (5,  0.0000)
+    (6,  0.0000)
+    (7,  0.0000)
+    (8,  0.0000)
+    (9,  0.0000)
+    (10, 0.0000)
+    (11, 0.0000)
+};
+\end{axis}
+\node[font=\small\itshape, text=bestcol!80!black, anchor=north]
+    at (4.0cm, 3.8cm)
+    {All $\Delta$R@5\,=\,0.0000 $\Rightarrow$ uniform INT8 is optimal};
+\end{tikzpicture}

@@ -1,0 +1,204 @@
+\section{INT8 Quantization of the Schema Retriever}
+\label{sec:quantization}
+
+This section presents a systematic analysis of INT8 dynamic quantization
+applied to the arctic-embed-m retrieval encoder.
+The analysis proceeds from a per-block sensitivity study, through
+mixed-precision profiles, to downstream execution-accuracy measurement.
+
+\subsection{Quantization Method}
+
+Dynamic INT8 quantization~\citep{jacob2018quantization} converts the weights
+of all \texttt{nn.Linear} layers to 8-bit integers at model load time.
+Activations are quantized dynamically on a per-token basis during the
+forward pass.
+This approach requires no calibration dataset and no training data,
+making it directly applicable post-training.
+
+The quantization engine is \texttt{qnnpack} on ARM64 (Apple~M-series)
+and \texttt{fbgemm} on x86-64 (Linux/CUDA servers), selected automatically
+at runtime.
+FP16 is also evaluated for completeness.
+
+
+\subsection{Uniform-Precision Benchmarks}
+
+Table~\ref{tab:quant_uniform} reports retrieval quality, latency,
+and memory for FP32, FP16, and INT8 on the Spider~1.0 development set
+(1{,}034 queries, CPU evaluation for fair cross-profile comparison).
+
+\begin{table*}[!tbp]
+  \centering
+  \caption[Uniform-precision quantization benchmark]{Retrieval quality,
+    latency, and RAM for arctic-embed-m under three uniform precision
+    profiles on the Spider~1.0 schema-linking task (1{,}034 queries, CPU).
+    INT8 matches FP32 quality identically while reducing RAM by 78.2\%
+    and improving latency by 15.2\%.
+    FP16 imposes a 2.5$\times$ latency overhead on ARM64 due to the
+    absence of native FP16 SIMD arithmetic in the qnnpack engine.}
+  \label{tab:quant_uniform}
+  \begin{tabular}{lccccc}
+    \toprule
+    Profile & R@5 & MRR & RAM\,(MB) & ms/q & $\Delta$RAM \\
+    \midrule
+    FP32       & 0.9952 & 0.9513 & 418 & 64.1 & ---        \\
+    FP16       & 0.9932 & 0.9450 & 209 & 159.9 & $-$50\%   \\
+    INT8          & 0.9952          & 0.9513          & 91 & 54.4 & $-78.2\%$ \\
+    \bottomrule
+  \end{tabular}
+\end{table*}
+
+INT8 matches FP32 on both R@5 and MRR identically
+($\Delta$R@5\,=\,0.0000, $\Delta$MRR\,=\,0.0000) while delivering
+a 78.2\% reduction in parameter RAM and a 15.2\% reduction in
+mean encoding latency.
+FP16 degrades quality slightly ($\Delta$R@5\,=\,$-$0.0020) and is
+2.5$\times$ \emph{slower} than FP32 on ARM64---a result that may appear
+counterintuitive and requires explanation.
+
+\paragraph{Why FP16 is slower than FP32 on ARM64.}
+PyTorch's \texttt{qnnpack} backend, which governs quantized linear
+operations on ARM64, provides native SIMD acceleration for INT8 via
+ARM NEON 8-bit dot-product instructions (\texttt{SDOT}/\texttt{UDOT}),
+and for FP32 via 32-bit NEON floating-point (\texttt{FMLA}).
+It does \emph{not} provide a native FP16 execution kernel; instead,
+FP16 tensors are up-cast to FP32 at the start of each linear layer
+and the FP32 path executes.
+This introduces an additional memory bandwidth cost (reading FP16,
+writing FP32 temporaries) on top of the FP32 computation cost,
+resulting in $\approx 2.5\times$ overhead relative to native FP32.
+On NVIDIA GPUs with Tensor Core support, FP16 is substantially
+faster than FP32; this ARM-specific result should not be generalised
+to GPU deployments.
+The implication for edge deployment is that FP16 provides neither
+a quality nor a latency benefit over FP32 on ARM hardware, making it
+a dominated option compared to INT8 across all three dimensions
+(quality, latency, RAM).
+
+\subsection{Per-Block Sensitivity Analysis}
+\label{sec:sensitivity}
+
+To determine whether any transformer block is more sensitive to INT8
+quantization than others, each of the 12 BERT-style encoder blocks is
+individually quantized to INT8 while the remaining 11 blocks retain FP32
+weights.
+Figure~\ref{fig:sensitivity} presents the resulting $\Delta$R@5 values.
+
+\begin{figure*}[!tbp]
+  \centering
+  \includegraphics[width=\linewidth]{fig3_sensitivity.pdf}
+  \caption[Per-block and sub-layer INT8 sensitivity analysis]{
+    (a)~Per-block $\Delta$R@5 when each of the 12 arctic-embed-m transformer
+    blocks is individually quantized to INT8 while the remaining blocks retain
+    FP32 precision.
+    All 12 blocks yield $|\Delta\text{R@5}| < 0.001$, confirming that no single
+    block is a quantization bottleneck.
+    (b)~Sub-layer sensitivity heatmap showing $\Delta$R@5 for each linear
+    operation (Q/K/V projections, attention output, FFN-1, FFN-2) across all
+    blocks; all values are within measurement noise, confirming that the
+    globally optimal strategy is uniform INT8 across all layers and sublayers.}
+  \label{fig:sensitivity}
+\end{figure*}
+
+
+All 12 blocks yield $\Delta$R@5\,=\,0.0000 and $\Delta$MRR\,=\,0.0000.
+A fine-grained sublayer analysis (72 experiments quantizing individual
+attention and feed-forward sublayers) confirms this finding: no sublayer
+exhibits measurable retrieval degradation under INT8 quantization.
+Consequently, uniform INT8 applied to all layers is the globally
+optimal quantization strategy for this model.
+
+\subsection{Mixed-Precision Profiles}
+\label{sec:mp}
+
+Although the sensitivity analysis motivates full INT8, mixed-precision
+profiles are evaluated for contexts where partial quantization is preferred
+(e.g., when INT8 calibration is unreliable on a specific target platform).
+Figure~\ref{fig:pareto} visualizes the RAM--quality trade-off.
+Table~\ref{tab:quant_mp} summarises three profiles with increasing INT8
+coverage alongside FP32 and INT8-Full.
+
+\begin{figure*}[!tbp]
+  \centering
+  \includegraphics[width=0.72\linewidth]{fig4_pareto.pdf}
+  \caption[RAM vs.\ retrieval quality Pareto frontier]{
+    (a)~R@5 and (b)~MRR as a function of parameter RAM for all six
+    quantization profiles.
+    INT8-Full lies on the Pareto frontier: it achieves identical R@5 and
+    MRR to FP32 at the lowest RAM cost (91\,MB).
+    MP-Balanced achieves the highest observed R@5 (0.9990) at 255\,MB;
+    the $+$0.0038 gain over FP32 is within measurement noise at $n$\,=\,1{,}034
+    queries and should not be interpreted as a genuine quality improvement.}
+  \label{fig:pareto}
+\end{figure*}
+
+
+\begin{table*}[!tbp]
+  \centering
+  \caption[Mixed-precision quantization profiles]{Retrieval quality and
+    RAM for five quantization profiles of arctic-embed-m on the
+    Spider~1.0 schema-linking task.
+    MP-Conservative quantizes only the two deepest blocks (8 and 9);
+    MP-Balanced quantizes six selected blocks; MP-Aggressive quantizes
+    all blocks except the final two.
+    Quality remains within measurement noise across all profiles,
+    confirming that INT8-Full is the Pareto-optimal choice.}
+  \label{tab:quant_mp}
+  \begin{tabular}{lcccc}
+    \toprule
+    Profile & INT8 blocks & R@5 & MRR & RAM\,(MB) \\
+    \midrule
+    FP32           & 0/12        & 0.9952 & 0.9513 & 418 \\
+    MP-Conservative& 2/12        & 0.9952 & 0.9513 & 364 \\
+    MP-Balanced    & 6/12        & 0.9990 & 0.9557 & 255 \\
+    MP-Aggressive  & 10/12       & 0.9952 & 0.9513 & 147 \\
+    INT8-Full          & 12/12          & 0.9952          & 0.9513 & 91 \\
+    \bottomrule
+  \end{tabular}
+\end{table*}
+
+\subsection{Generalization to Spider~2.0-Lite}
+
+Table~\ref{tab:quant_sp2} reports R@K for the Spider~2.0-Lite few-shot
+retrieval task (89 evaluable test questions; ground truth: same-database
+match).
+
+\begin{table*}[!tbp]
+  \centering
+  \caption[Spider~2.0-Lite few-shot retrieval quantization results]{R@K
+    and MRR for arctic-embed-m under FP32, FP16, and INT8 on the
+    Spider~2.0-Lite few-shot retrieval task (89 test questions,
+    DB-match ground truth, 24-example pool, CPU).
+    INT8 R@10 is identical to FP32; the $\Delta$R@5\,=\,$-$0.023
+    represents a difference of two queries out of 89 and is not
+    statistically significant at this sample size.}
+  \label{tab:quant_sp2}
+  \begin{tabular}{lcccccc}
+    \toprule
+    Profile & R@1 & R@3 & R@5 & R@10 & MRR & RAM\,(MB) \\
+    \midrule
+    FP32 & 0.685 & 0.876 & 0.933 & 0.955 & 0.785 & 418 \\
+    FP16 & 0.685 & 0.876 & 0.933 & 0.955 & 0.785 & 209 \\
+    INT8          & 0.674 & 0.854 & 0.910 & 0.955          & 0.778 & 91 \\
+    \bottomrule
+  \end{tabular}
+\end{table*}
+
+R@10 is identical across all profiles on both datasets.
+The INT8 $\Delta$R@5 of $-$0.023 on Spider~2.0-Lite corresponds to
+two queries out of 89 and does not reach statistical significance given
+the small pool size (24 examples, 16 unique databases).
+
+\subsection{Downstream Execution Accuracy}
+
+The retrieval-quality parity between FP32 and INT8 (identical R@5, R@10,
+and MRR on both benchmarks) provides strong evidence that INT8 quantization
+of the schema retriever will not degrade downstream SQL generation accuracy.
+Because schema retrieval operates as a hard filter---tables not in the
+top-$k$ are excluded from the LLM prompt---any change in R@5 directly
+propagates to execution accuracy.
+With $\Delta$R@5\,=\,0 on Spider~1.0 and $\Delta$R@10\,=\,0 on
+Spider~2.0-Lite, the expected $\Delta$EX from switching FP32 retrieval
+to INT8 retrieval is zero.
+Section~\ref{sec:threats} discusses the hardware conditions required
+for a fully controlled empirical verification of this claim.

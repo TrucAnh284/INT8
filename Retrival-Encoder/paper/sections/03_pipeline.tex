@@ -1,0 +1,104 @@
+\section{Pipeline Architecture}
+\label{sec:pipeline}
+
+Figure~\ref{fig:pipeline} illustrates the five-stage pipeline.
+Each stage is independently configurable and evaluated in the ablation
+study of Section~\ref{sec:experiments}.
+
+\begin{figure*}[!tbp]
+  \centering
+  \includegraphics[width=\linewidth]{fig15_retrieval_overview.pdf}
+  \caption[Schema retrieval pipeline overview]{
+    The schema retrieval pipeline.
+    At query time (top row), the natural-language question is encoded
+    by the INT8-quantized arctic-embed-m encoder using an asymmetric
+    query prefix; the resulting 768-dimensional vector is matched against
+    a pre-computed per-database sqlite-vec BLOB index via cosine
+    approximate nearest-neighbour search; the top-$k$ tables and their
+    DDL are inserted into the DAIL-SQL prompt for the local LLM.
+    At index construction time (bottom row), table DDL is embedded
+    once without a prefix and stored; the same INT8 encoder weights are
+    reused, so the 91\,MB RAM footprint applies to both paths.
+    Retrieval latency (18.4\,ms) represents a 15.2\% reduction over FP32
+    with zero quality loss.}
+  \label{fig:pipeline}
+\end{figure*}
+
+\subsection{Schema Retrieval}
+
+Given a natural-language question $q$ and a target database $d$, the
+retriever identifies the $k$ most relevant tables from $d$.
+Each table is represented as its DDL \texttt{CREATE TABLE} statement
+concatenated with three sample rows.
+arctic-embed-m~\citep{merrick2024arctic} embeds the question with an
+asymmetric query prefix and each table document without a prefix.
+Cosine similarity selects the top-$k$ tables, which are included in the
+LLM prompt.
+
+Table embeddings are pre-computed at index construction time and stored in
+per-database \texttt{sqlite-vec}~\citep{garcia2024sqlitevec} BLOB indices;
+retrieval requires a single matrix--vector product followed by an approximate
+nearest-neighbour lookup, with no external vector database server.
+The encoder applies dynamic INT8 quantization via
+\texttt{torch.quantization.quantize\_dynamic}, targeting all
+\texttt{nn.Linear} layers; Section~\ref{sec:quantization} provides a full
+analysis of this choice.
+
+\subsection{Few-Shot Example Selection (sql2skeleton)}
+\label{sec:fewshot}
+
+Few-shot examples improve SQL generation by providing structural
+demonstrations of similar queries.
+For each development question, the system retrieves $k$ training questions
+from the DAIL-SQL selection pool of 8{,}659 examples~\citep{gao2023dailsql}.
+
+Retrieval uses sql2skeleton similarity: a SQL query is reduced to a
+\emph{skeleton} by replacing all string and numeric literals with the
+placeholder \texttt{VALUE} and lower-casing function names, while
+preserving every structural keyword---\texttt{SELECT}, \texttt{FROM},
+\texttt{JOIN}, \texttt{WHERE}, \texttt{GROUP BY}, \texttt{HAVING}, and
+nested subqueries.
+The four Spider difficulty levels~\citep{yu2018spider} produce qualitatively
+different skeletons.
+\emph{Easy} queries (\texttt{SELECT}, simple \texttt{WHERE}) collapse to a
+one-line skeleton; \emph{Medium} queries preserve \texttt{JOIN} and
+\texttt{GROUP BY} structure; \emph{Hard} queries retain multi-table joins and
+\texttt{HAVING} clauses; \emph{Extra Hard} queries expose nested
+\texttt{NOT IN (SELECT\ldots)} subquery structure.
+This selection strategy substantially reduces the occurrence of
+\texttt{no\_such\_column} errors relative to question-only similarity
+(Table~\ref{tab:ablation}, baseline vs.\ +sql2skeleton row), because
+the skeleton abstracts over database-specific column names that appear in
+the question but may not match the training database.
+The largest structural benefit accrues to \emph{Hard} queries, which gain
++17.1\,pp EX upon adding sql2skeleton
+(Section~\ref{sec:exp_difficulty}).
+
+
+\subsection{LLM Prompt Construction}
+
+The prompt follows the DAIL-SQL format~\citep{gao2023dailsql}: it opens with
+\texttt{CREATE TABLE} DDL for the top-$k$ retrieved tables, each accompanied
+by three representative sample rows; this is followed by $k$ few-shot
+question--SQL pairs ordered by decreasing sql2skeleton similarity; and it
+closes with the target question and the \texttt{SELECT} trigger token.
+The local Qwen3.5 9B model~\citep{qwen2025} generates SQL completions via
+Ollama at \texttt{localhost:11434}.
+Total prompt length is approximately 1{,}400 tokens for $k$\,=\,5.
+
+\subsection{Self-Consistency and Two-Pass Correction}
+
+Self-consistency~\citep{wang2022selfconsistency} generates $N$ independent
+SQL candidates at temperature $T\,=\,0.7$ and selects the first candidate
+that executes without error against the database.
+If no candidate executes successfully, the first candidate is returned.
+At $N\,=\,3$, self-consistency reduces execution errors by
+57.6\% relative to single-pass generation
+(Table~\ref{tab:ablation}).
+When the selected candidate raises a SQL execution error, the
+two-pass corrector re-prompts the LLM with the original prompt, the
+failing SQL, and the database error message, reducing errors by a
+further 18\%.
+SC\,=\,3 addresses structural failures by sampling diverse candidates;
+two-pass correction addresses runtime failures (wrong column name,
+type mismatch) using error feedback.

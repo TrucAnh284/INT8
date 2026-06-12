@@ -1,0 +1,73 @@
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+.Python
+
+# ── Secrets & env ────────────────────────────────────────────────────────────
+.env
+*.env.local
+
+# ── Model weights (large binaries) ───────────────────────────────────────────
+minilm_core/models/
+spider1_pipeline/models/
+*.pt
+*.pth
+*.safetensors
+*.bin
+*.onnx
+
+# ── Vector indexes (auto-generated, can be rebuilt) ──────────────────────────
+spider1_pipeline/vec_index/
+minilm_core/v3/
+
+# ── Spider datasets (large, not redistributable) ─────────────────────────────
+spider1/database/
+spider1/train_others.json
+spider2/
+
+# ── Pipeline outputs ─────────────────────────────────────────────────────────
+spider1_pipeline/output/
+spider1_pipeline/output_server/
+predicted_sql_*.txt
+
+# ── LaTeX build artifacts ─────────────────────────────────────────────────────
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.log
+paper/*.out
+paper/*.synctex.gz
+paper/*.fls
+paper/*.fdb_latexmk
+
+# ── macOS ────────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Jupyter ──────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── Misc large files ─────────────────────────────────────────────────────────
+*.zip
+*.tar.gz
+*.gz
+main.pdf

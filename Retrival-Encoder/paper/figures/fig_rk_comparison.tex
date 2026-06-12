@@ -1,0 +1,55 @@
+% R@K comparison across datasets and precision profiles — pgfplots grouped bars
+\begin{tikzpicture}
+\begin{axis}[
+    ybar,
+    width=8.5cm, height=5.5cm,
+    bar width=8pt,
+    ymin=0.60, ymax=1.02,
+    ytick={0.65,0.70,0.75,0.80,0.85,0.90,0.95,1.00},
+    yticklabel style={font=\small},
+    ylabel={Recall@K},
+    xtick=data,
+    symbolic x coords={R@1,R@3,R@5,R@10},
+    xticklabel style={font=\small},
+    legend style={
+        at={(0.01,0.99)}, anchor=north west,
+        font=\small, cells={anchor=west},
+        column sep=2pt
+    },
+    legend columns=2,
+    enlarge x limits=0.15,
+    grid=major, grid style={dashed, gray!25},
+    axis x line=bottom, axis y line=left,
+]
+\addplot[fill=fp32col!80, draw=fp32col!90!black] coordinates {
+    (R@1,  0.5019)
+    (R@3,  0.9051)
+    (R@5,  0.9952)
+    (R@10, 1.0000)
+};
+\addplot[fill=int8col!80, draw=int8col!90!black] coordinates {
+    (R@1,  0.5019)
+    (R@3,  0.9051)
+    (R@5,  0.9952)
+    (R@10, 1.0000)
+};
+\addplot[fill=fp32col!40, draw=fp32col!60!black, pattern=north east lines] coordinates {
+    (R@1,  0.6854)
+    (R@3,  0.8764)
+    (R@5,  0.9326)
+    (R@10, 0.9551)
+};
+\addplot[fill=int8col!40, draw=int8col!60!black, pattern=north east lines] coordinates {
+    (R@1,  0.6742)
+    (R@3,  0.8539)
+    (R@5,  0.9101)
+    (R@10, 0.9551)
+};
+\legend{
+    SP1.0 FP32,
+    SP1.0 INT8,
+    SP2.0 FP32,
+    SP2.0 INT8
+}
+\end{axis}
+\end{tikzpicture}

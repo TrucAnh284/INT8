@@ -1,0 +1,108 @@
+\section{Supplementary Figures}
+\label{app:suppfigs}
+
+\subsection{Spider~2.0-Lite Error Taxonomy}
+\label{app:error_taxonomy}
+
+Figure~\ref{fig:error_taxonomy} presents the distribution of error types
+for zero-shot and few-shot ($k$\,=\,3) configurations on Spider~2.0-Lite.
+The primary effect of few-shot retrieval is a reduction in
+\texttt{no\_such\_column} errors ($-$19 queries, $-$36\%),
+consistent with the hypothesis that few-shot examples guide the LLM
+to use the correct column names from the retrieved schema.
+
+\begin{figure*}[!t]
+  \centering
+  \includegraphics[width=0.68\linewidth, trim=0 8pt 0 8pt, clip]{fig7_error_taxonomy.pdf}
+  \caption[Spider~2.0-Lite error taxonomy: zero-shot vs.\ few-shot]{
+    Distribution of query outcomes across 135 Spider~2.0-Lite questions
+    for zero-shot and few-shot ($k$\,=\,3) configurations.}
+  \label{fig:error_taxonomy}
+\end{figure*}
+
+\vspace{-4pt}
+\subsection{Mixed-Precision Profile Map}
+\label{app:mpheatmap}
+
+Figure~\ref{fig:mpheatmap} shows the quantization dtype assigned to each
+encoder component under each of the six profiles evaluated.
+Token embedding (nn.Embedding) is retained in FP32 under all INT8 profiles
+because \texttt{quantize\_dynamic} targets only \texttt{nn.Linear} layers.
+
+\begin{figure*}[!t]
+  \centering
+  \includegraphics[width=0.85\linewidth]{fig14_mp_heatmap.pdf}
+  \caption[Mixed-precision profile map]{
+    Per-component quantization dtype (FP32, FP16, INT8) for each of the
+    six profiles.
+    INT8-Full (right column) is highlighted as the Pareto-optimal choice.}
+  \label{fig:mpheatmap}
+\end{figure*}
+
+\clearpage
+\section{Benchmark Tools}
+\label{app:tools}
+
+Table~\ref{tab:tools} lists the benchmark scripts developed for this work.
+All scripts are included in the supplementary material.
+
+\begin{table}[!h]
+  \centering
+  \caption[Benchmark scripts]{Benchmark scripts developed for this work
+    and the measurements each produces.}
+  \label{tab:tools}
+  \begin{tabular}{ll}
+    \toprule
+    Script & Measurement \\
+    \midrule
+    \texttt{bench\_latency.py}           & Encode latency + RAM per profile \\
+    \texttt{bench\_significance.py}      & Bootstrap CI + McNemar's test \\
+    \texttt{bench\_schema\_linking.py}   & R@K, MRR vs.\ quantization profile \\
+    \texttt{bench\_layer\_sensitivity.py}& Per-layer INT8 sensitivity \\
+    \texttt{bench\_spider2\_rk.py}       & Spider~2.0 few-shot R@K \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Reproducibility}
+\label{app:repro}
+
+\textbf{Spider~1.0 best configuration:}
+\begin{lstlisting}[language=bash,basicstyle=\small\ttfamily,breaklines=true]
+cd spider1_pipeline
+EMBED_INT8=true python3 run.py run \
+  --split dev --sc_n 3 --k 5 \
+  --no_pruning --two-pass --evaluate
+\end{lstlisting}
+
+\textbf{Spider~2.0-Lite full pipeline:}
+\begin{lstlisting}[language=bash,basicstyle=\small\ttfamily,breaklines=true]
+cd spider2/spider2_pipeline
+python3 run.py run \
+  --few-shot-k 3 --sc 3 --passes 2 --evaluate
+\end{lstlisting}
+
+\textbf{Quantization benchmark:}
+\begin{lstlisting}[language=bash,basicstyle=\small\ttfamily,breaklines=true]
+cd spider1_pipeline
+python3 bench_schema_linking.py --device cpu
+python3 bench_layer_sensitivity.py --fine
+\end{lstlisting}
+
+\section{Hardware Configuration}
+\label{app:hardware}
+
+\noindent
+\begin{tabular}{ll}
+  \toprule
+  Component & Specification \\
+  \midrule
+  Local CPU/MPS & Apple M-series (ARM64, unified memory) \\
+  Server GPU    & NVIDIA RTX~3090, 24\,GB VRAM \\
+  LLM serving   & Ollama v0.x, \texttt{localhost:11434} \\
+  LLM model     & \texttt{qwen3.5:9b} (GGUF, Q4\_K\_M) \\
+  Embedding     & arctic-embed-m, 109.5\,M parameters \\
+  Python        & 3.12.0 \\
+  PyTorch       & 2.10.0 \\
+  \bottomrule
+\end{tabular}

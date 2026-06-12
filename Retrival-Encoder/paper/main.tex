@@ -1,0 +1,110 @@
+%% Edge-Ready Text-to-SQL: INT8-Quantized Semantic Retrieval for Local LLMs
+%% Elsevier CAS double-column format
+\documentclass[a4paper,fleqn]{cas-dc}
+
+\usepackage[authoryear,longnamesfirst]{natbib}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{microtype}
+\usepackage{subcaption}
+\usepackage{tabularx}
+\usepackage{siunitx}
+\usepackage[section]{placeins}
+\usepackage{float}
+\usepackage{needspace}
+
+\graphicspath{{figures/pdf/}}
+\setlength{\emergencystretch}{3em}
+\overfullrule=0pt
+
+% Float placement: allow more figures per page, reduce text requirement
+\setcounter{totalnumber}{8}
+\setcounter{topnumber}{6}
+\setcounter{dbltopnumber}{4}
+\renewcommand{\topfraction}{0.75}
+\renewcommand{\bottomfraction}{0.70}
+\renewcommand{\dbltopfraction}{0.75}
+\renewcommand{\textfraction}{0.15}
+\renewcommand{\floatpagefraction}{0.60}
+\renewcommand{\dblfloatpagefraction}{0.60}
+\setlength{\dblfloatsep}{10pt}
+
+\begin{document}
+\let\WriteBookmarks\relax
+
+\shorttitle{Lossless INT8 Compression for Edge Text-to-SQL Retrieval}
+\shortauthors{B.~Nguyen et~al.}
+
+\title[mode=title]{Lossless INT8 Compression of Schema Retrieval Encoders
+  for Edge-Deployed Text-to-SQL}
+
+\author[1]{Brian Nguyen}[orcid=0000-0000-0000-0000]
+\ead{brian@example.com}
+\affiliation[1]{organization={University},
+  addressline={Address},
+  city={City},
+  country={Country}}
+
+\begin{abstract}
+Natural-language interfaces to relational databases---Text-to-SQL
+systems---have achieved impressive accuracy using large language models (LLMs),
+but prevailing systems rely on cloud APIs and GPU-accelerated servers,
+precluding deployment in privacy-sensitive or resource-constrained environments.
+A key bottleneck for local deployment is the schema-linking retrieval encoder:
+quantizing it to reduce memory and latency risks degrading the retrieval
+quality on which SQL accuracy depends, yet no prior work has measured this
+risk for dense-retrieval encoders in the Text-to-SQL setting.
+
+This paper presents a training-free, fully local Text-to-SQL pipeline and
+investigates whether INT8 dynamic quantization of the arctic-embed-m
+schema retriever is safe for edge deployment.
+We conduct a systematic 84-experiment sensitivity analysis covering all
+12 transformer blocks and every linear sublayer of the encoder, evaluating
+R@5 and MRR on the Spider~1.0 development set (1{,}034 questions).
+We further perform a five-component ablation study of the end-to-end
+pipeline and validate generalisation on the harder Spider~2.0-Lite
+benchmark (135 local SQLite questions).
+
+The sensitivity analysis reveals that INT8 quantization introduces zero
+retrieval-quality degradation (R@5 and MRR unchanged versus FP32) while
+reducing encoder RAM by 78.2\% (418\,MB to 91\,MB) and improving encoding
+latency by 15.2\%.
+The ablation study identifies five synergistic pipeline components that
+collectively raise execution accuracy from 0.786 to 0.824 on Spider~1.0,
+with each component statistically significant ($p < 0.001$, McNemar's test).
+On Spider~2.0-Lite the full pipeline achieves an execution accuracy of 0.111,
+confirming that the same design principles transfer to enterprise-scale queries.
+
+These findings establish INT8 as the Pareto-optimal quantization
+profile---identical quality to FP32 at one-quarter the memory
+footprint---and provide the first empirical evidence that schema-linking
+retrievers can be safely compressed for edge Text-to-SQL deployment.
+\end{abstract}
+
+\begin{keywords}
+INT8 quantization \sep Schema retrieval \sep Text-to-SQL \sep
+Edge deployment \sep Encoder compression
+\end{keywords}
+
+\maketitle
+
+\input{sections/01_introduction}
+\input{sections/02_background}
+\input{sections/03_pipeline}
+\input{sections/04_quantization}
+\input{sections/05_experiments}
+\input{sections/06_discussion}
+\input{sections/07_conclusion}
+
+\bibliographystyle{model1-num-names}
+\bibliography{references}
+
+\appendix
+\input{sections/08_appendix}
+
+\end{document}

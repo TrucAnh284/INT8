@@ -1,0 +1,29 @@
+We present a lightweight, training-free Text-to-SQL pipeline that achieves
+competitive execution accuracy on Spider~1.0 (\mbox{EX\,=\,0.824}) using a
+9-billion-parameter local language model (Qwen3.5) paired with an
+INT8-quantized arctic-embed-m schema retriever.
+The pipeline requires no fine-tuning, no cloud API access, and runs entirely
+on consumer hardware.
+
+The core contribution is a systematic quantization study of the retrieval
+encoder.
+Dynamic INT8 quantization reduces retriever RAM by 78.2\% (418\,MB
+$\to$ 91\,MB) and improves encoding latency by 15.2\% (64\,ms
+$\to$ 54\,ms per query) with \textbf{zero retrieval-quality degradation}
+($\Delta$R@5\,=\,0.0000, $\Delta$MRR\,=\,0.0000).
+A per-block sensitivity analysis across all 12 transformer layers confirms
+that uniform INT8 quantization is the globally optimal configuration.
+
+The pipeline further incorporates five synergistic components---schema
+retrieval, sql2skeleton few-shot selection, self-consistency candidate
+generation (SC\,=\,3), and two-pass SQL correction---each evaluated in a
+rigorous ablation study on 1{,}034 Spider~1.0 development questions
+(all improvements $p < 0.001$, McNemar's test).
+Validation on Spider~2.0-Lite demonstrates generalization to a
+substantially harder benchmark, where the full pipeline achieves
+EX\,=\,0.111 (up from 0.067 zero-shot baseline; few-shot retrieval
+alone accounts for $+$55\% relative gain).
+
+These results demonstrate that an edge-deployable Text-to-SQL system
+with a quantized retrieval encoder introduces no measurable accuracy
+penalty relative to its full-precision counterpart.

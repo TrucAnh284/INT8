@@ -1,0 +1,36 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+This paper presents a lightweight, training-free Text-to-SQL pipeline
+that achieves EX\,=\,0.824 on Spider~1.0 using a 9B-parameter local LLM
+and an INT8-quantized arctic-embed-m schema retriever.
+Five pipeline components are each validated with statistically significant
+improvements ($p < 0.001$, McNemar's test) in a controlled ablation study.
+
+The central finding is that dynamic INT8 quantization of the schema
+retrieval encoder introduces zero measurable degradation in retrieval
+quality ($\Delta$R@5\,=\,0.0000, $\Delta$MRR\,=\,0.0000 on Spider~1.0;
+$\Delta$R@10\,=\,0.0000 on Spider~2.0-Lite) while reducing encoder RAM
+by 78.2\% (418\,MB $\to$ 91\,MB) and improving encoding latency by 15.2\%.
+A 12-block per-layer sensitivity analysis confirms that uniform INT8
+is the globally optimal quantization strategy for this model.
+
+These results establish that INT8 quantization is a safe default for
+dense retrieval encoders in Text-to-SQL pipelines, enabling
+deployment on resource-constrained edge devices---Jetson Nano,
+Raspberry Pi~4, mobile platforms---without retrieval-quality risk.
+
+Validation on Spider~2.0-Lite confirms that the pipeline and
+its quantization properties generalize to a substantially harder
+benchmark, achieving a 55\% relative improvement in execution accuracy
+through few-shot retrieval from a compact gold SQL pool.
+
+Three directions appear most productive for future work.
+Replacing the 9B LLM with a fine-tuned code model is expected to
+substantially reduce semantic errors on analytical Spider~2.0-Lite queries.
+Expanding the Spider~2.0-Lite few-shot pool beyond 24 examples, ideally
+with per-database coverage, is expected to improve few-shot retrieval
+effectiveness on this benchmark.
+Finally, extending the INT8 sensitivity analysis to the LLM component
+itself---using AWQ or GPTQ quantization of Qwen3.5---represents a natural
+continuation of the quantization safety characterization initiated here.

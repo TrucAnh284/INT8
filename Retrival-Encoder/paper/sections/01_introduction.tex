@@ -1,0 +1,96 @@
+\section{Introduction}
+\label{sec:intro}
+
+Text-to-SQL systems translate natural-language questions into SQL queries,
+enabling non-expert users to query relational databases directly.
+Enterprise analytics platforms, business intelligence tools, and conversational
+data assistants all represent deployment contexts for such systems.
+Accurate, low-latency SQL generation is therefore a practical prerequisite
+for wide adoption.
+
+Recent state-of-the-art systems rely on large proprietary language models
+such as GPT-4~\citep{openai2023gpt4}, achieving execution accuracy (EX) of
+up to 0.866 on the Spider~1.0 benchmark~\citep{gao2023dailsql}.
+These results, however, come with significant barriers: cloud API costs,
+data privacy constraints, network latency, and the requirement of continuous
+internet connectivity.
+A growing class of applications---clinical decision support, on-device
+analytics, air-gapped enterprise environments---cannot use cloud-hosted models.
+
+Despite this progress, no rigorous study of a fully local, training-free
+pipeline has examined the interaction between retrieval encoder quantization
+and downstream SQL generation quality.
+Prior quantization research focuses almost exclusively on the language model
+itself~\citep{dettmers2022llmint8,xiao2023smoothquant,
+shen2020qbert,zafrir2019q8bert};
+the schema-linking retrieval encoder---a critical component of
+retrieval-augmented Text-to-SQL~\citep{gao2023dailsql,eben2025rasl}---has
+not been examined.
+This gap is practically important: an encoder that degrades under
+quantization would propagate retrieval errors directly into SQL generation
+accuracy, invalidating the benefit of model compression.
+
+This paper addresses that gap with four contributions.
+First, it presents a systematic ablation of five pipeline components on
+Spider~1.0 (1{,}034 development questions), establishing statistically
+significant ($p < 0.001$, McNemar's test) accuracy improvements for each.
+Second, it provides the first INT8 quantization study for a schema-retrieval
+encoder in a Text-to-SQL pipeline, demonstrating 78.2\% RAM reduction and
+15.2\% latency improvement with zero retrieval-quality degradation, verified
+through an 84-experiment per-layer and per-sublayer sensitivity analysis.
+Third, validation on Spider~2.0-Lite~\citep{lei2025spider2}---a substantially
+harder enterprise benchmark---confirms that both the pipeline design and the
+quantization safety finding generalize beyond Spider~1.0.
+Fourth, the complete, reproducible implementation runs locally on consumer
+hardware without cloud API access or model fine-tuning.
+
+Figure~\ref{fig:overview} provides a high-level view of the three
+contributions in a single diagram.
+Panel~(a) shows the end-to-end pipeline: a natural-language question is
+encoded by \texttt{arctic-embed-m}, matched against a pre-computed
+\texttt{sqlite-vec} index to retrieve the top-5 relevant tables, and
+fed---together with sql2skeleton few-shot examples---to a locally running
+Qwen3.5~9B LLM that generates the final SQL under self-consistency with
+two-pass error correction, achieving EX~=~0.824 on Spider~1.0.
+Panels~(b) and~(c) contrast the FP32 baseline encoder (418\,MB RAM,
+64.1\,ms/query) with the INT8-quantized variant (91\,MB RAM, 54.4\,ms/query):
+the 84-experiment per-block sensitivity analysis confirms $\Delta$R@5\,=\,0
+and $\Delta$MRR\,=\,0, establishing INT8 as the Pareto-optimal profile.
+
+\begin{figure*}[!t]
+  \centering
+  \includegraphics[width=\linewidth]{fig0_overview.pdf}
+  \caption[System overview: pipeline, FP32 baseline, and INT8-quantized encoder]{
+    Overview of the proposed system.
+    \textbf{(a)}~End-to-end Text-to-SQL pipeline: a natural-language question
+    is encoded by the arctic-embed-m retrieval encoder, matched via cosine ANN
+    search against a pre-computed \texttt{sqlite-vec} index to retrieve the
+    top-5 relevant tables and their DDL, then combined with
+    sql2skeleton-selected few-shot examples into a DAIL-SQL prompt for
+    Qwen3.5~9B running locally under self-consistency ($N$\,=\,3) with
+    two-pass error correction.
+    The full pipeline achieves EX\,=\,0.824 on Spider~1.0 and EX\,=\,0.111
+    on Spider~2.0-Lite.
+    \textbf{(b)}~FP32 encoder baseline: all 12 encoder blocks and the pooler
+    run in FP32 (418\,MB RAM, 64.1\,ms encoding latency,
+    R@5\,=\,0.9952, MRR\,=\,0.9513).
+    The sensitivity heat strip at the bottom shows the per-block
+    $\Delta$R@5 for all 84 INT8 experiments.
+    \textbf{(c)}~INT8-quantized encoder (this work): all \texttt{nn.Linear}
+    layers are quantized to INT8 via \texttt{torch.quantization.quantize\_dynamic}
+    (token embeddings remain FP32 as \texttt{nn.Embedding} is not targeted).
+    RAM drops to 91\,MB ($-$78.2\%), latency to 54.4\,ms ($-$15.2\%), and
+    $\Delta$R@5\,=\,0 with $\Delta$MRR\,=\,0---identical retrieval quality
+    to FP32 at one-quarter the memory footprint.
+    The runtime quantization engine is \texttt{qnnpack} on ARM64
+    (Apple~M-series) and \texttt{fbgemm} on x86-64, selected automatically.}
+  \label{fig:overview}
+\end{figure*}
+
+The remainder of this paper is organized as follows.
+Section~\ref{sec:background} reviews related work.
+Section~\ref{sec:pipeline} describes the pipeline architecture.
+Section~\ref{sec:quantization} presents the quantization analysis.
+Section~\ref{sec:experiments} reports ablation and comparison experiments.
+Section~\ref{sec:discussion} discusses limitations and design implications.
+Section~\ref{sec:conclusion} concludes.

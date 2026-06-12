@@ -1,0 +1,22 @@
+# ── Core ML / Embedding ────────────────────────────────────────────────────────
+torch>=2.1.0
+transformers>=4.37.0
+sentence-transformers>=2.6.0
+accelerate>=0.26.0
+
+# ── Vector store ───────────────────────────────────────────────────────────────
+sqlite-vec>=0.1.1
+pysqlite3-binary>=0.5.0          # macOS fix: enable_load_extension support
+
+# ── LLM clients ────────────────────────────────────────────────────────────────
+openai>=1.0.0              # OpenAI API + Ollama OpenAI-compat endpoint
+ollama>=0.4.0              # Ollama native Python client (qwen3.5, etc.)
+
+# ── Data & evaluation ──────────────────────────────────────────────────────────
+sqlparse>=0.5.0
+func_timeout>=4.3.5
+
+# ── Utilities ──────────────────────────────────────────────────────────────────
+numpy>=1.26.0
+tqdm>=4.66.0
+python-dotenv>=1.0.0

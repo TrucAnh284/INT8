@@ -1,0 +1,54 @@
+% Ablation bar chart — pgfplots horizontal bars
+\begin{tikzpicture}
+\begin{axis}[
+    xbar,
+    width=8cm, height=5.5cm,
+    xmin=0.74, xmax=0.86,
+    bar width=7pt,
+    xlabel={Execution Accuracy (EX)},
+    xtick={0.75,0.77,0.79,0.81,0.83,0.85},
+    xticklabel style={font=\small},
+    ytick=data,
+    yticklabels={
+        Baseline ($k$=3\,SC=1),
+        +sql2skeleton,
+        +$k$=5,
+        +SC=3,
+        +2-pass,
+        \textbf{SC=3+$k$=5+2-pass}
+    },
+    yticklabel style={font=\small, anchor=east},
+    nodes near coords,
+    nodes near coords style={font=\tiny, anchor=west, xshift=1pt},
+    every node near coord/.append style={/pgf/number format/.cd, fixed, precision=3},
+    enlarge y limits=0.12,
+    tick align=outside,
+    axis x line=bottom,
+    axis y line=left,
+    grid=major, grid style={dashed, gray!30},
+    legend style={at={(0.98,0.02)}, anchor=south east, font=\tiny},
+]
+\addplot[
+    fill=fp32col!70, draw=fp32col!80!black
+] coordinates {
+    (0.7856, 0)
+    (0.8047, 1)
+    (0.8130, 2)
+    (0.8101, 3)
+    (0.8227, 4)
+    (0.8243, 5)
+};
+\addplot[
+    fill=none, draw=bestcol, thick, forget plot,
+    xbar, bar width=9pt
+] coordinates {
+    (0.8243, 5)
+};
+\end{axis}
+% significance markers
+\node[font=\tiny, text=black!60] at (7.1, 0.65) {$p{<}0.001$};
+\node[font=\tiny, text=black!60] at (7.1, 1.55) {$p{<}0.001$};
+\node[font=\tiny, text=black!60] at (7.1, 2.45) {$p{<}0.001$};
+\node[font=\tiny, text=black!60] at (7.1, 3.35) {$p{<}0.001$};
+\node[font=\tiny, text=black!60] at (7.1, 4.25) {$p{<}0.001$};
+\end{tikzpicture}

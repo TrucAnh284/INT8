@@ -1,0 +1,118 @@
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Why INT8 Does Not Degrade Retrieval Quality}
+\label{sec:rkdef}
+
+The zero-degradation result ($\Delta$R@5\,=\,0, $\Delta$MRR\,=\,0 on
+Spider~1.0 across 1{,}034 queries; formal definitions in
+Section~\ref{sec:metrics}) admits a straightforward empirical explanation.
+Dynamic INT8 quantization replaces each FP32 weight with its nearest
+8-bit integer under a per-tensor scale $s = \max(|W|)/127$, introducing
+rounding errors bounded by $s/2$ per element.
+For arctic-embed-m's 768-dimensional embeddings trained with contrastive
+objectives, semantic similarity is distributed across the entire embedding
+dimension: no single dimension carries a disproportionate share of the
+discriminative signal.
+Consequently, the per-element rounding noise averages out in the
+inner-product similarity computation, and the relative ordering of
+table candidates is preserved.
+This result is consistent with prior work on INT8 quantization of BERT
+encoders~\citep{zafrir2019q8bert}, which reported comparable stability on
+GLUE tasks, and generalises here to the cross-domain schema retrieval
+setting.
+
+This observation generalizes: embedding models trained for retrieval
+with large hidden dimensions are robust to INT8 quantization.
+Practitioners deploying dense retrievers on edge hardware
+(Jetson Nano, Raspberry~Pi~4, mobile devices) should consider INT8
+quantization as a default optimization, as it uniformly reduces RAM
+and improves CPU latency without retrieval-quality risk.
+
+\subsection{Synergy Between Self-Consistency and Two-Pass Correction}
+
+Self-consistency and two-pass correction address complementary failure
+modes.
+Self-consistency reduces \textit{systematic} errors: when three
+independent candidates are generated, at least one is likely to avoid
+a particular structural mistake.
+Two-pass correction reduces \textit{runtime} errors: queries that parse
+successfully but fail at execution (wrong column name, type mismatch)
+are correctable given the error message.
+The synergy observed in Table~\ref{tab:ablation} (+3.87\,pp combined
+vs.\ +2.45\,pp and +3.71\,pp individually) confirms that these
+two components target distinct error types.
+
+\subsection{Spider~2.0-Lite Difficulty}
+
+The low absolute accuracy on Spider~2.0-Lite (EX\,$\approx$\,0.10)
+reflects structural differences from Spider~1.0.
+Spider~2.0-Lite queries require window functions, recursive CTEs,
+and five-way analytical joins; these constructs appear rarely in the
+24-example gold SQL pool, limiting the effectiveness of few-shot retrieval.
+The 24-example pool contains only 16 unique databases, leaving 34\%
+of test questions without a same-database few-shot example.
+
+A larger pool, task-specific fine-tuning of the LLM, or schema-aware
+SQL decomposition represent the most promising directions
+for improving Spider~2.0-Lite accuracy beyond the current results.
+
+\subsection{Threats to Validity}
+\label{sec:threats}
+
+Several threats to validity apply to the experimental conclusions.
+
+\textbf{Platform dependence.}
+INT8 latency results are specific to the qnnpack backend on ARM64 (Apple
+M-series).
+Performance on x86-64 (fbgemm backend) or CUDA may differ; in particular,
+NVIDIA Tensor Cores provide native INT8 SIMD at higher throughput,
+making the latency gap between INT8 and FP32 on GPU hardware narrower
+than reported here.
+
+\textbf{LLM non-determinism.}
+SQL generation uses self-consistency at temperature $T\,=\,0.7$, introducing
+stochastic variation across runs.
+The 95\% bootstrap confidence intervals (Table~\ref{tab:ablation}) account
+for this at the population level, but individual run-to-run variance
+may differ from reported means by up to $\pm$0.3\,pp.
+
+\textbf{Downstream EX comparison.}
+The FP32 best-configuration run (EX\,=\,0.824) and the INT8 retriever
+run were executed on different hardware (local Mac vs.\ server GPU), with
+the same Ollama LLM.
+A fully controlled comparison---identical hardware, identical LLM version,
+identical random seed---is left for future work.
+
+\textbf{Spider~2.0-Lite coverage.}
+Only 135 of 547 Spider~2.0-Lite questions use local SQLite databases;
+the remaining 412 require BigQuery or Snowflake access.
+Results on the local subset may not generalize to the full benchmark,
+particularly for cloud-specific SQL dialects.
+
+\textbf{Few-shot pool size.}
+The Spider~2.0-Lite few-shot pool contains 24 gold SQL examples across
+16 databases; 34\% of the 135 test questions have no pool example from
+the same database.
+R@K estimates on Spider~2.0-Lite carry uncertainty due to this small
+sample size and should be interpreted as indicative rather than definitive.
+
+\subsection{Limitations}
+
+Four limitations bound the generalizability of these findings.
+First, Qwen3.5~9B generates SQL that contains semantic errors on complex
+queries; replacing it with a larger or fine-tuned code model is the most
+direct path to closing the remaining gap to DAIL-SQL on Spider~1.0 and
+improving Spider~2.0-Lite accuracy beyond 0.111.
+Second, the 24-example few-shot pool for Spider~2.0-Lite is too small to
+provide diverse coverage across 30 databases, limiting the benefit of
+few-shot retrieval on this benchmark.
+Third, a fully controlled downstream EX comparison between FP32 and INT8
+retrieval requires both configurations to run on identical hardware and
+LLM versions; the retrieval-quality parity ($\Delta$R@5\,=\,0) provides
+strong indirect evidence of $\Delta$EX\,=\,0, but direct measurement is
+left for future work.
+Fourth, Spider~2.0-Lite results cover only the 135-question local SQLite
+subset; the full 547-question benchmark requires BigQuery and Snowflake
+access, and the SQL dialects used there may respond differently to the
+proposed pipeline.

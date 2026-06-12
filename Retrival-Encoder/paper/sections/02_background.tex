@@ -1,0 +1,102 @@
+\section{Related Work}
+\label{sec:background}
+
+\subsection{Spider Benchmarks}
+
+Spider~1.0~\citep{yu2018spider} comprises 10{,}181 question-SQL pairs across
+200 databases of varying complexity (simple to extra-hard).
+The development set contains 1{,}034 questions spanning 20 databases and
+serves as the standard evaluation split.
+Execution accuracy (EX)---the fraction of questions for which the predicted
+SQL returns the same result set as the gold SQL---is the primary metric.
+
+Spider~2.0-Lite~\citep{lei2025spider2} is a substantially harder benchmark
+targeting enterprise-scale analytics.
+It comprises 547 questions; the local SQLite subset contains 135 questions
+across 30 databases, featuring complex constructs such as window functions,
+recursive CTEs, and multi-table analytical joins.
+Most published systems achieve EX\,=\,0.00 on this benchmark without task-specific
+adaptation.
+
+\subsection{Text-to-SQL Approaches}
+
+Two broad paradigms dominate the literature.
+Fine-tuned approaches such as RESDSQL~\citep{li2023resdsql} and
+PICARD~\citep{scholak2021picard} achieve competitive accuracy by training
+a task-specific model on Spider data; RESDSQL attains EX\,=\,0.791 with a
+T5-3B encoder-decoder, while PICARD uses constrained decoding to reach 0.754.
+Both require retraining when the target domain changes, limiting their
+use in cross-domain edge deployment.
+
+Prompting-based approaches operate without fine-tuning by leveraging
+few-shot examples and chain-of-thought decomposition.
+DAIL-SQL~\citep{gao2023dailsql} achieves EX\,=\,0.866 by constructing
+prompts with schema DDL, sample rows, and structurally similar examples
+selected via sql2skeleton similarity.
+DIN-SQL~\citep{pourreza2023dinsql} decomposes queries into subproblems,
+achieving EX\,=\,0.826.
+DCG-SQL~\citep{lee2025dcgsql} further enhances in-context learning via
+a deep contextual schema link graph, attaining 0.876 on Spider~1.0.
+These approaches require proprietary cloud models and cannot be
+reproduced on consumer hardware.
+
+Code-specialised local models such as Qwen2.5-Coder~\citep{hui2024qwen25coder}
+enable Text-to-SQL on edge hardware, but systematic ablation studies of
+pipeline components under resource constraints remain scarce in the
+literature~\citep{liu2025survey}.
+
+\subsection{Quantization for Neural Retrieval}
+
+\citet{jacob2018quantization} established the theoretical framework for
+INT8 inference: weights are stored as 8-bit integers with a per-tensor scale
+factor, and activations are quantized dynamically on a per-token basis during
+the forward pass.
+This approach requires no calibration data and applies post-training.
+Q8BERT~\citep{zafrir2019q8bert} demonstrated that 8-bit quantization of all
+linear layers in BERT retains task accuracy on GLUE, establishing INT8 as a
+reliable default for encoder-only transformers.
+Q-BERT~\citep{shen2020qbert} subsequently showed that Hessian-based analysis
+identifies the most sensitive layers, enabling mixed-precision quantization
+with smaller accuracy loss.
+
+For large language models, LLM.int8()~\citep{dettmers2022llmint8} isolates
+outlier activations in FP16 while quantizing the remainder to INT8,
+enabling 8-bit inference at billion-parameter scale.
+SmoothQuant~\citep{xiao2023smoothquant} achieves accurate INT8
+weight--activation quantization by migrating the quantization difficulty from
+activations to weights via a per-channel scaling transformation.
+GPTQ~\citep{dettmers2022gptq} and AWQ~\citep{lin2023awq} extend
+post-training quantization to 4-bit precision with minimal accuracy loss.
+
+Despite this extensive literature, the impact of INT8 quantization on
+dense retrieval encoders in Text-to-SQL pipelines has not been studied.
+The present work fills this gap by conducting the first
+per-layer and per-sublayer sensitivity analysis for a schema-linking
+retriever, measuring both retrieval quality and downstream execution accuracy.
+
+\subsection{Schema Retrieval and Linking}
+
+Schema linking---identifying which tables and columns in a database are
+relevant to a natural-language question---is a prerequisite for accurate
+cross-database SQL generation~\citep{lei2020schema}.
+\citet{wang2020ratsql} introduced relation-aware schema encoding via a
+typed graph representation, establishing the importance of structural
+relationships between question tokens and schema elements.
+Dense retrieval with sentence embeddings~\citep{reimers2019sbert}
+subsequently outperformed sparse retrieval for schema linking.
+
+Recent work has scaled schema linking to thousands of tables.
+RASL~\citep{eben2025rasl} proposes retrieval-augmented schema linking for
+massive databases, while LinkAlign~\citep{wang2025linkalign} addresses
+multi-database settings where the correct database must be identified before
+table retrieval.
+\citet{nahid2025rethinking} introduces a context-aware bidirectional retrieval
+approach that re-ranks candidates using both question-to-schema and
+schema-to-question signals.
+AutoLink~\citep{wang2025autolink} extends schema exploration to unseen schemas
+without manual annotation.
+
+The Snowflake arctic-embed-m model~\citep{merrick2024arctic} is an asymmetric
+embedding model trained for passage retrieval that generalises well
+across domains without fine-tuning, making it suitable for the
+cross-database schema retrieval task.

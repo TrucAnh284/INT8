@@ -1,0 +1,47 @@
+% Pipeline architecture — TikZ
+\begin{tikzpicture}[
+    node distance=0.55cm and 0cm,
+    box/.style={
+        draw, rounded corners=3pt,
+        minimum width=5.8cm, minimum height=0.7cm,
+        font=\small, align=center,
+        fill=white
+    },
+    iobox/.style={
+        draw, rounded corners=6pt,
+        minimum width=5.8cm, minimum height=0.6cm,
+        font=\small\bfseries, align=center,
+        fill=gray!12
+    },
+    quantbox/.style={
+        draw, rounded corners=3pt,
+        minimum width=5.8cm, minimum height=0.7cm,
+        font=\small, align=center,
+        fill=blue!8, draw=blue!50!black
+    },
+    arrow/.style={-Stealth, thick},
+    label/.style={font=\footnotesize\itshape, text=gray!70!black}
+]
+
+\node[iobox]  (q)   {Natural-Language Question};
+\node[quantbox, below=of q]  (ret) {Schema Retrieval\\{\footnotesize arctic-embed-m INT8 $\cdot$ top-$k$ tables}};
+\node[box,    below=of ret] (sel) {Few-Shot Selection (sql2skeleton)\\{\footnotesize $k$=5 examples from DAIL training pool}};
+\node[box,    below=of sel] (gen) {SQL Generation $\times$ SC\,=\,3\\{\footnotesize Qwen3.5 9B $\cdot$ Ollama $\cdot$ $T$\,=\,0.7}};
+\node[box,    below=of gen] (exe) {Executor-Based Selection\\{\footnotesize return first candidate that executes}};
+\node[box,    below=of exe] (cor) {2-Pass Correction\\{\footnotesize re-prompt with SQL\,+\,error message}};
+\node[iobox,  below=of cor] (out) {Predicted SQL};
+
+\draw[arrow] (q)   -- (ret);
+\draw[arrow] (ret) -- (sel);
+\draw[arrow] (sel) -- (gen);
+\draw[arrow] (gen) -- (exe);
+\draw[arrow] (exe) -- (cor);
+\draw[arrow] (cor) -- (out);
+
+\node[label, right=0.35cm of ret] {\S\,\ref{sec:quantization}};
+\node[label, right=0.35cm of sel] {\S\,\ref{sec:fewshot}};
+
+\node[draw=blue!40, dashed, rounded corners=4pt,
+      fit=(ret), inner sep=3pt,
+      label={[font=\tiny\color{blue!60!black}, anchor=south east]south east:INT8}] {};
+\end{tikzpicture}

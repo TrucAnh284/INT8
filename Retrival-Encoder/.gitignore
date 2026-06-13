@@ -71,3 +71,16 @@ paper/*.fdb_latexmk
 *.tar.gz
 *.gz
 main.pdf
+
+# local large files
+spider1/dataset-spider1/spider_data/database/
+spider1_pipeline/models/
+spider1_pipeline/vec_index/
+spider1_pipeline/output/
+
+# local transfer/report files
+../INT8_Retrival_Encoder_transfer.zip
+../experiments_report.docx
+../~$periments_report.docx
+*.zip
+~$*.docx
